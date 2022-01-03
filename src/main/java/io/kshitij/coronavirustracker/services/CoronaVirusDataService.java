@@ -22,12 +22,19 @@ import java.util.List;
 public class CoronaVirusDataService {
 
     private static String VIRUS_DATA_URL = "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv";
-    boolean isHeader = false;
+    private static boolean containsHeaders = true;
     //one(final) instance of parsed csv data
     private List<LocationStats> allStats = new ArrayList<>();
 
+    //getter for allStats
+    public List<LocationStats> getAllStats() {
+        return allStats;
+    }
+
+
+    //post to processing this class by Spring, run this function
     @PostConstruct
-    @Scheduled(cron = "* * 1 * * *")
+//    @Scheduled(cron = "* * 1 * * *")
     public void fetchVirusData() throws IOException, InterruptedException {
 
         //another(local/temp) instance of parsed csv data
@@ -40,43 +47,39 @@ public class CoronaVirusDataService {
 
         HttpResponse<String> httpResponse = client.send(request, HttpResponse.BodyHandlers.ofString());
 
-//        System.out.println(httpResponse.body());
-
         StringReader in = new StringReader(httpResponse.body());
         Iterable<CSVRecord> records = CSVFormat.DEFAULT.parse(in);
-
-
 
         for (CSVRecord record : records) {
             LocationStats locationStat = new LocationStats();
 
-            //setting headers
-            if(isHeader == false){
-                locationStat.setState(record.get(0));
-                locationStat.setCountry(record.get(1));
-
-                String temp = record.get(record.size()-1);
-                locationStat.setLatestTotalCases(temp);
-                System.out.println(locationStat);
+            //skiping first row as it only contains header
+            if(containsHeaders == true ){
+                containsHeaders = false;
+                continue;
             }
-
             else {
 
                 locationStat.setState(record.get(0));
                 locationStat.setCountry(record.get(1));
 
-                String temp = record.get(record.size()-1);
-                locationStat.setLatestTotalCases(temp);
-                System.out.println(locationStat);
+                String temp = record.get(record.size() - 1);
 
+                //As headers are skipped already, no chance of NumberFormatException
+                locationStat.setLatestTotalCases(Integer.parseInt(record.get(record.size() - 1)));
+
+                //for testing
+                //System.out.println(locationStat);
+
+                //updating temp/latest data instance
                 newStats.add(locationStat);
-//            String customerNo = record.get("CustomerNo");
-//            String name = record.get("Name");
 
             }
 
+
         }
 
+        //updating final data instance
         this.allStats = newStats;
 
         //using two instances for the same data as there will always be some data to show while processing the latest data
